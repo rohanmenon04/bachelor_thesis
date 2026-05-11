@@ -31,30 +31,85 @@ N_CELLS = GRID_H * GRID_W   # 49 spatial tokens per observation
 D_MODEL       = 64
 N_HEADS       =  4
 N_LAYERS      =  2
-CODEBOOK_SIZE = 32
+CODEBOOK_SIZE = 64   # increased from 32; more capacity for semantic specialisation
 LATENT_DIM    = 32   # continuous AE bottleneck dimension
-COMMITMENT_BETA = 0.25
+COMMITMENT_BETA     = 0.10   # reduced from 0.25; less aggressive encoder compression
+EMA_DECAY           = 0.99   # decay factor for EMA codebook update
+DEAD_CODE_THRESHOLD = 1.0    # EMA cluster-size below this triggers code restart
 
 
 class VQLayer(nn.Module):
     """
-    Vector quantization module.
+    Vector quantization module with EMA codebook updates and dead-code restart.
 
-    Maps a continuous vector z to the nearest entry in a learned codebook,
-    using the straight-through gradient estimator so gradients flow to the encoder.
+    Codebook entries are maintained via exponential moving averages (EMA) of
+    the encoder outputs assigned to each entry, following van den Oord et al.
+    (2017) Appendix A and Razavi et al. (2019). This replaces the original
+    gradient-based codebook update, which caused collapse.
 
-    Commitment loss has two terms:
-      - Codebook update:  pushes codebook entries toward encoder outputs
-      - Encoder update:   pushes encoder outputs toward chosen codebook entry
+    Dead-code restart: any entry whose EMA cluster size falls below
+    DEAD_CODE_THRESHOLD is reinitialised to a random encoder output from the
+    current batch, immediately returning it to the active pool.
+
+    Commitment loss retains only the encoder-side term (beta * ||z - sg[z_q]||^2)
+    because the codebook-side term (||sg[z] - z_q||^2) is redundant when the
+    codebook is maintained by EMA.
+
+    See observations/edits_codebook_01.md for full diagnostic rationale.
     """
 
-    def __init__(self, codebook_size=CODEBOOK_SIZE, d_model=D_MODEL, beta=COMMITMENT_BETA):
+    def __init__(
+        self,
+        codebook_size=CODEBOOK_SIZE,
+        d_model=D_MODEL,
+        beta=COMMITMENT_BETA,
+        ema_decay=EMA_DECAY,
+        dead_threshold=DEAD_CODE_THRESHOLD,
+    ):
         super().__init__()
         self.K = codebook_size
         self.D = d_model
         self.beta = beta
+        self.ema_decay = ema_decay
+        self.dead_threshold = dead_threshold
+
         self.codebook = nn.Embedding(codebook_size, d_model)
         nn.init.uniform_(self.codebook.weight, -1.0 / codebook_size, 1.0 / codebook_size)
+        self.codebook.weight.requires_grad_(False)   # EMA owns all codebook updates
+
+        # EMA state: running count and running sum of assigned encoder outputs
+        self.register_buffer('ema_cluster_size', torch.zeros(codebook_size))
+        self.register_buffer('ema_embed_avg',    self.codebook.weight.data.clone())
+
+    def _ema_update(self, z, indices):
+        """Update codebook via EMA and reinitialise any dead codes."""
+        one_hot = F.one_hot(indices, self.K).float()            # (B, K)
+
+        cluster_size = one_hot.sum(0)                           # (K,)
+        self.ema_cluster_size.mul_(self.ema_decay).add_(
+            cluster_size * (1.0 - self.ema_decay)
+        )
+
+        embed_sum = one_hot.T @ z.detach()                      # (K, D)
+        self.ema_embed_avg.mul_(self.ema_decay).add_(
+            embed_sum * (1.0 - self.ema_decay)
+        )
+
+        # Laplace smoothing: prevents division-by-zero for rarely-used codes
+        n = self.ema_cluster_size.sum()
+        smoothed = (self.ema_cluster_size + 1e-5) / (n + self.K * 1e-5) * n
+        self.codebook.weight.data.copy_(
+            self.ema_embed_avg / smoothed.unsqueeze(1)
+        )
+
+        # Dead-code restart: reinitialise under-used entries to random batch samples
+        dead = self.ema_cluster_size < self.dead_threshold
+        n_dead = int(dead.sum().item())
+        if n_dead > 0:
+            rand_idx = torch.randint(0, z.shape[0], (n_dead,), device=z.device)
+            self.codebook.weight.data[dead] = z.detach()[rand_idx]
+            self.ema_cluster_size[dead]     = self.dead_threshold
+            self.ema_embed_avg[dead]        = z.detach()[rand_idx]
 
     def forward(self, z):
         """
@@ -72,20 +127,22 @@ class VQLayer(nn.Module):
             + self.codebook.weight.pow(2).sum(1)
         )
         indices = dist.argmin(dim=1)          # (B,)
-        z_q = self.codebook(indices)          # (B, D)
+        z_q     = self.codebook(indices)      # (B, D)
 
         # Straight-through: pass gradients to encoder as if z_q == z
         z_q_st = z + (z_q - z).detach()
 
-        commit_loss = (
-            F.mse_loss(z.detach(), z_q)               # move codebook → z
-            + self.beta * F.mse_loss(z, z_q.detach()) # move z → codebook
-        )
+        if self.training:
+            self._ema_update(z, indices)
+
+        # Encoder-only commitment loss; codebook direction is handled by EMA
+        commit_loss = self.beta * F.mse_loss(z, z_q.detach())
+
         return z_q_st, indices, commit_loss
 
     def get_perplexity(self, indices):
         """
-        Codebook utilization metric.
+        Codebook utilisation metric.
         Equals K when all codes are used equally; ~1 indicates collapse.
         """
         probs = F.one_hot(indices, self.K).float().mean(0)

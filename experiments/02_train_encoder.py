@@ -183,7 +183,7 @@ def plot_training(vq_hist, cont_hist, save_path):
 # ---------------------------------------------------------------------------
 
 def main():
-    os.makedirs('checkpoints', exist_ok=True)
+    os.makedirs('checkpoints/edits01', exist_ok=True)
     os.makedirs('plots',       exist_ok=True)
 
     print(f"Device: {DEVICE}")
@@ -201,8 +201,8 @@ def main():
     print(f"Parameters: {sum(p.numel() for p in vq_model.parameters()):,}")
     vq_hist  = train_vq(vq_model, loader, N_EPOCHS)
     vq_model.cpu()
-    torch.save(vq_model.state_dict(), 'checkpoints/vq_encoder.pt')
-    print("Saved checkpoints/vq_encoder.pt")
+    torch.save(vq_model.state_dict(), 'checkpoints/edits01/vq_encoder.pt')
+    print("Saved checkpoints/edits01/vq_encoder.pt")
 
     final_perp = vq_hist['perplexity'][-1]
     pct = 100 * final_perp / CODEBOOK_SIZE
@@ -218,8 +218,8 @@ def main():
     print(f"Parameters: {sum(p.numel() for p in cont_model.parameters()):,}")
     cont_hist  = train_continuous(cont_model, loader, N_EPOCHS)
     cont_model.cpu()
-    torch.save(cont_model.state_dict(), 'checkpoints/continuous_encoder.pt')
-    print("Saved checkpoints/continuous_encoder.pt")
+    torch.save(cont_model.state_dict(), 'checkpoints/edits01/continuous_encoder.pt')
+    print("Saved checkpoints/edits01/continuous_encoder.pt")
 
     plot_training(vq_hist, cont_hist, 'plots/encoder_training.png')
     print("\nNext: python 03_linear_probe.py")

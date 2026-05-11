@@ -189,7 +189,7 @@ def plot_codebook_usage(vq_indices, labels, label_keys, save_path):
 # ---------------------------------------------------------------------------
 
 def main():
-    os.makedirs('plots', exist_ok=True)
+    os.makedirs('plots/edits01', exist_ok=True)
 
     with open('data/trajectories.pkl', 'rb') as f:
         data = pickle.load(f)
@@ -198,10 +198,10 @@ def main():
 
     # Load models
     vq_model   = TransformerVQEncoder()
-    vq_model.load_state_dict(torch.load('checkpoints/vq_encoder.pt',         map_location='cpu'))
+    vq_model.load_state_dict(torch.load('checkpoints/edits01/vq_encoder.pt',         map_location='cpu'))
 
     cont_model = ContinuousEncoder()
-    cont_model.load_state_dict(torch.load('checkpoints/continuous_encoder.pt', map_location='cpu'))
+    cont_model.load_state_dict(torch.load('checkpoints/edits01/continuous_encoder.pt', map_location='cpu'))
 
     print("Encoding observations...")
     vq_indices = encode_vq(vq_model, observations)
@@ -244,8 +244,8 @@ def main():
             f" {acc_cont:>12.3f} {acc_vq:>12.3f}"
         )
 
-    plot_probe_results(results, LABEL_KEYS, 'plots/linear_probe.png')
-    plot_codebook_usage(vq_indices, labels, LABEL_KEYS, 'plots/codebook_usage.png')
+    plot_probe_results(results, LABEL_KEYS, 'plots/edits01/linear_probe.png')
+    plot_codebook_usage(vq_indices, labels, LABEL_KEYS, 'plots/edits01/codebook_usage.png')
 
     print("\nNext: python 04_ppo_comparison.py  (may take ~15-30 min)")
 
