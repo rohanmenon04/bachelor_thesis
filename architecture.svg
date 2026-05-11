@@ -1,0 +1,156 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="720" font-family="Arial, sans-serif">
+
+  <!-- Background -->
+  <rect width="900" height="720" fill="#f8f9fa"/>
+
+  <!-- Title -->
+  <text x="450" y="36" text-anchor="middle" font-size="18" font-weight="bold" fill="#1a1a2e">TransformerVQ Encoder Architecture</text>
+  <text x="450" y="56" text-anchor="middle" font-size="12" fill="#555">MiniGrid-DoorKey-5x5 · d_model=64 · codebook K=32 · 2 Transformer layers · 4 attention heads</text>
+
+  <!-- ── STEP 1: Input ─────────────────────────────────────────────────── -->
+  <rect x="30" y="80" width="130" height="90" rx="8" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="95" y="103" text-anchor="middle" font-size="11" font-weight="bold" fill="#1e40af">INPUT</text>
+  <text x="95" y="120" text-anchor="middle" font-size="10" fill="#1e40af">7 × 7 × 3 grid</text>
+  <text x="95" y="135" text-anchor="middle" font-size="9" fill="#3b82f6">ch0: object type (0-10)</text>
+  <text x="95" y="148" text-anchor="middle" font-size="9" fill="#3b82f6">ch1: colour (0-5)</text>
+  <text x="95" y="161" text-anchor="middle" font-size="9" fill="#3b82f6">ch2: door state (0-2)</text>
+
+  <!-- Arrow 1→2 -->
+  <line x1="160" y1="125" x2="192" y2="125" stroke="#888" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ── STEP 2: Per-channel embedding ─────────────────────────────────── -->
+  <rect x="193" y="80" width="145" height="90" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+  <text x="265" y="103" text-anchor="middle" font-size="11" font-weight="bold" fill="#4c1d95">EMBED</text>
+  <text x="265" y="118" text-anchor="middle" font-size="9" fill="#5b21b6">3 separate lookup tables</text>
+  <line x1="210" y1="128" x2="320" y2="128" stroke="#c4b5fd" stroke-width="0.5" stroke-dasharray="3"/>
+  <text x="265" y="137" text-anchor="middle" font-size="9" fill="#5b21b6">type  → 22-dim</text>
+  <text x="265" y="150" text-anchor="middle" font-size="9" fill="#5b21b6">color → 21-dim</text>
+  <text x="265" y="163" text-anchor="middle" font-size="9" fill="#5b21b6">state → 21-dim</text>
+
+  <!-- Arrow 2→3 -->
+  <line x1="338" y1="125" x2="370" y2="125" stroke="#888" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="354" y="118" text-anchor="middle" font-size="8" fill="#888">concat</text>
+
+  <!-- ── STEP 3: Token sequence ─────────────────────────────────────────── -->
+  <rect x="371" y="75" width="175" height="100" rx="8" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.5"/>
+  <text x="458" y="97" text-anchor="middle" font-size="11" font-weight="bold" fill="#78350f">TOKEN SEQUENCE</text>
+  <text x="458" y="113" text-anchor="middle" font-size="9" fill="#92400e">Flatten 7×7 → 49 spatial tokens</text>
+  <text x="458" y="126" text-anchor="middle" font-size="9" fill="#92400e">each token: 64-dim vector</text>
+  <line x1="388" y1="133" x2="535" y2="133" stroke="#fde68a" stroke-width="0.5" stroke-dasharray="3"/>
+  <text x="458" y="145" text-anchor="middle" font-size="9" fill="#d97706">+ prepend [CLS] token  → 50 tokens</text>
+  <text x="458" y="158" text-anchor="middle" font-size="9" fill="#d97706">+ positional embeddings</text>
+
+  <!-- Arrow 3→4 -->
+  <line x1="546" y1="125" x2="578" y2="125" stroke="#888" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ── STEP 4: Transformer ────────────────────────────────────────────── -->
+  <rect x="579" y="70" width="160" height="110" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="659" y="93" text-anchor="middle" font-size="11" font-weight="bold" fill="#14532d">TRANSFORMER</text>
+  <text x="659" y="108" text-anchor="middle" font-size="9" fill="#166534">ENCODER</text>
+  <line x1="596" y1="115" x2="722" y2="115" stroke="#86efac" stroke-width="0.5" stroke-dasharray="3"/>
+  <text x="659" y="127" text-anchor="middle" font-size="9" fill="#166534">2 layers</text>
+  <text x="659" y="140" text-anchor="middle" font-size="9" fill="#166534">4 attention heads</text>
+  <text x="659" y="153" text-anchor="middle" font-size="9" fill="#166534">FF dim = 256</text>
+  <text x="659" y="166" text-anchor="middle" font-size="9" fill="#166534">dropout = 0.1</text>
+
+  <!-- Arrow 4→5: down from transformer -->
+  <line x1="659" y1="180" x2="659" y2="215" stroke="#888" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="700" y="200" text-anchor="start" font-size="8" fill="#888">CLS output only</text>
+  <text x="700" y="211" text-anchor="start" font-size="8" fill="#888">(B, 64)</text>
+
+  <!-- ── STEP 5: VQ Layer ───────────────────────────────────────────────── -->
+  <rect x="554" y="216" width="210" height="130" rx="8" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5"/>
+  <text x="659" y="238" text-anchor="middle" font-size="11" font-weight="bold" fill="#7f1d1d">VQ LAYER</text>
+  <line x1="571" y1="245" x2="747" y2="245" stroke="#fca5a5" stroke-width="0.5" stroke-dasharray="3"/>
+  <text x="659" y="260" text-anchor="middle" font-size="9" fill="#991b1b">Codebook: 32 entries × 64-dim</text>
+  <text x="659" y="275" text-anchor="middle" font-size="9" fill="#991b1b">Find nearest entry by L2 distance</text>
+  <text x="659" y="290" text-anchor="middle" font-size="9" fill="#991b1b">→ discrete token index  (0–31)</text>
+  <line x1="571" y1="298" x2="747" y2="298" stroke="#fca5a5" stroke-width="0.5" stroke-dasharray="3"/>
+  <text x="659" y="311" text-anchor="middle" font-size="9" fill="#b91c1c" font-style="italic">Straight-through estimator:</text>
+  <text x="659" y="324" text-anchor="middle" font-size="9" fill="#b91c1c" font-style="italic">gradients flow back to encoder</text>
+  <text x="659" y="337" text-anchor="middle" font-size="9" fill="#b91c1c" font-style="italic">as if no discretisation happened</text>
+
+  <!-- Two outputs from VQ -->
+  <!-- Output A: discrete index (right) -->
+  <line x1="764" y1="280" x2="820" y2="280" stroke="#dc2626" stroke-width="1.5" marker-end="url(#arr-red)"/>
+  <rect x="821" y="255" width="60" height="50" rx="6" fill="#fecdd3" stroke="#dc2626" stroke-width="1.2"/>
+  <text x="851" y="275" text-anchor="middle" font-size="9" font-weight="bold" fill="#7f1d1d">TOKEN</text>
+  <text x="851" y="289" text-anchor="middle" font-size="9" fill="#7f1d1d">INDEX</text>
+  <text x="851" y="303" text-anchor="middle" font-size="9" fill="#7f1d1d">0 – 31</text>
+
+  <!-- Output B: quantized vector (down) -->
+  <line x1="659" y1="346" x2="659" y2="395" stroke="#888" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="700" y="368" text-anchor="start" font-size="8" fill="#888">quantized vector</text>
+  <text x="700" y="379" text-anchor="start" font-size="8" fill="#888">(B, 64)</text>
+
+  <!-- ── STEP 6: Decoder (training only) ───────────────────────────────── -->
+  <rect x="554" y="396" width="210" height="85" rx="8" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="659" y="418" text-anchor="middle" font-size="11" font-weight="bold" fill="#075985">DECODER  </text>
+  <text x="659" y="418" text-anchor="start" font-size="9" fill="#0369a1" dx="38">training only</text>
+  <line x1="571" y1="426" x2="747" y2="426" stroke="#7dd3fc" stroke-width="0.5" stroke-dasharray="3"/>
+  <text x="659" y="441" text-anchor="middle" font-size="9" fill="#0369a1">MLP: 64 → 256 → 7×7×(11+6+3)</text>
+  <text x="659" y="456" text-anchor="middle" font-size="9" fill="#0369a1">Reconstructs the original grid</text>
+  <text x="659" y="471" text-anchor="middle" font-size="9" fill="#0369a1">Loss: cross-entropy per channel</text>
+
+  <!-- ── LOSS BOX ───────────────────────────────────────────────────────── -->
+  <rect x="554" y="503" width="210" height="70" rx="8" fill="#f3f4f6" stroke="#6b7280" stroke-width="1.2"/>
+  <text x="659" y="522" text-anchor="middle" font-size="11" font-weight="bold" fill="#374151">TRAINING LOSS</text>
+  <line x1="571" y1="528" x2="747" y2="528" stroke="#d1d5db" stroke-width="0.5"/>
+  <text x="659" y="542" text-anchor="middle" font-size="9" fill="#374151">Reconstruction loss  (cross-entropy)</text>
+  <text x="659" y="555" text-anchor="middle" font-size="9" fill="#374151">+ Commitment loss  (encoder → codebook)</text>
+  <text x="659" y="568" text-anchor="middle" font-size="9" fill="#374151">+ Codebook loss     (codebook → encoder)</text>
+
+  <line x1="659" y1="481" x2="659" y2="503" stroke="#888" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ── INFERENCE NOTE ─────────────────────────────────────────────────── -->
+  <rect x="554" y="596" width="210" height="50" rx="8" fill="#fefce8" stroke="#a16207" stroke-width="1.2"/>
+  <text x="659" y="616" text-anchor="middle" font-size="10" font-weight="bold" fill="#78350f">AT INFERENCE</text>
+  <text x="659" y="633" text-anchor="middle" font-size="9" fill="#92400e">Decoder discarded. Token index</text>
+  <text x="659" y="646" text-anchor="middle" font-size="9" fill="#92400e">fed into PPO policy.</text>
+  <line x1="659" y1="573" x2="659" y2="596" stroke="#a16207" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arr-amber)"/>
+
+  <!-- ── LEFT SIDE: What PPO sees ──────────────────────────────────────── -->
+  <rect x="30" y="360" width="160" height="140" rx="8" fill="#fdf4ff" stroke="#a21caf" stroke-width="1.5"/>
+  <text x="110" y="383" text-anchor="middle" font-size="11" font-weight="bold" fill="#701a75">PPO POLICY</text>
+  <line x1="47" y1="390" x2="173" y2="390" stroke="#e879f9" stroke-width="0.5" stroke-dasharray="3"/>
+  <text x="110" y="405" text-anchor="middle" font-size="9" fill="#701a75">Receives codebook embedding</text>
+  <text x="110" y="418" text-anchor="middle" font-size="9" fill="#701a75">vector for the token (64-dim)</text>
+  <line x1="47" y1="427" x2="173" y2="427" stroke="#e879f9" stroke-width="0.5" stroke-dasharray="3"/>
+  <text x="110" y="441" text-anchor="middle" font-size="9" fill="#86198f">Actor head  → action logits</text>
+  <text x="110" y="454" text-anchor="middle" font-size="9" fill="#86198f">Critic head → value estimate</text>
+  <line x1="47" y1="462" x2="173" y2="462" stroke="#e879f9" stroke-width="0.5" stroke-dasharray="3"/>
+  <text x="110" y="476" text-anchor="middle" font-size="9" fill="#701a75">Encoder frozen during PPO</text>
+  <text x="110" y="489" text-anchor="middle" font-size="9" fill="#701a75">MLP policy: [64, 64]</text>
+
+  <!-- Arrow: token index → PPO -->
+  <line x1="821" y1="280" x2="851" y2="280" stroke="#dc2626" stroke-width="0"/>
+  <!-- Route: from token index box down and left to PPO -->
+  <polyline points="851,305 851,530 110,530 110,500" fill="none" stroke="#a21caf" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-purple)"/>
+  <text x="480" y="525" text-anchor="middle" font-size="9" fill="#a21caf" font-style="italic">token index used at inference</text>
+
+  <!-- ── COMPARISON NOTE (bottom) ─────────────────────────────────────── -->
+  <rect x="30" y="560" width="500" height="100" rx="8" fill="#fff7ed" stroke="#c2410c" stroke-width="1.2"/>
+  <text x="280" y="580" text-anchor="middle" font-size="11" font-weight="bold" fill="#7c2d12">vs. IRIS (Micheli et al., 2023)</text>
+  <line x1="47" y1="586" x2="513" y2="586" stroke="#fed7aa" stroke-width="0.5"/>
+  <text x="47" y="601" font-size="9" fill="#9a3412">  IRIS:      CNN tokenizer  →  discrete tokens  →  Transformer WORLD MODEL  →  policy trains on imagined futures</text>
+  <text x="47" y="617" font-size="9" fill="#9a3412">  Yours:  Transformer encoder  →  discrete tokens  →  PPO policy trains directly on frozen tokens</text>
+  <line x1="47" y1="625" x2="513" y2="625" stroke="#fed7aa" stroke-width="0.5"/>
+  <text x="47" y="639" font-size="9" fill="#c2410c">  Key gap: no world model means no imagination — PPO must learn entirely from real environment interactions.</text>
+  <text x="47" y="652" font-size="9" fill="#c2410c">  This is likely why C_Discrete_VQ scored 0.00 — the frozen token may not carry enough signal for direct policy learning.</text>
+
+  <!-- ── ARROWHEAD DEFS ─────────────────────────────────────────────────── -->
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#888"/>
+    </marker>
+    <marker id="arr-red" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#dc2626"/>
+    </marker>
+    <marker id="arr-purple" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#a21caf"/>
+    </marker>
+    <marker id="arr-amber" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#a16207"/>
+    </marker>
+  </defs>
+</svg>
