@@ -29,8 +29,8 @@ Requires:
   checkpoints/edits01/continuous_encoder.pt
 
 Outputs:
-  results/edits02/ppo_returns.npy   — dict of {condition: (n_seeds, n_checkpoints)} arrays
-  plots/edits02/ppo_comparison.png
+  results/ppo_returns.npy   — dict of {condition: (n_seeds, n_checkpoints)} arrays
+  plots/ppo_comparison.png
 
 Estimated runtime: ~15-40 min depending on hardware (2 seeds, 50k steps each).
 Increase N_SEEDS to 5 for final results (Agarwal et al. 2021 recommendation).
@@ -179,6 +179,11 @@ class ContinuousExtractor(BaseFeaturesExtractor):
             p.requires_grad = False
         self.enc.eval()
 
+    def train(self, mode=True):
+        super().train(mode)
+        self.enc.eval()
+        return self
+
     def forward(self, obs):
         with torch.no_grad():
             z = self.enc.encode(obs.long())
@@ -201,6 +206,11 @@ class DiscreteVQExtractor(BaseFeaturesExtractor):
         for p in self.enc.parameters():
             p.requires_grad = False
         self.enc.eval()
+
+    def train(self, mode=True):
+        super().train(mode)
+        self.enc.eval()
+        return self
 
     def forward(self, obs):
         with torch.no_grad():
@@ -243,6 +253,11 @@ class SentenceExtractor(BaseFeaturesExtractor):
         for p in self.enc.parameters():
             p.requires_grad = False
         self.enc.eval()
+
+    def train(self, mode=True):
+        super().train(mode)
+        self.enc.eval()
+        return self
 
     def forward(self, obs):
         # obs: (B, H+1, 7, 7, 3) float32

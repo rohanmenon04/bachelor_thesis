@@ -178,7 +178,7 @@ def plot_semantic_heatmap(labels, token_indices, save_path):
 # ---------------------------------------------------------------------------
 
 def main():
-    os.makedirs('plots/edits01', exist_ok=True)
+    os.makedirs('plots/edits02', exist_ok=True)
 
     with open('data/trajectories.pkl', 'rb') as f:
         data = pickle.load(f)
@@ -200,11 +200,10 @@ def main():
         bar = '█' * int(cnt / len(observations) * 100)
         print(f"  Token {tok:3d}: {cnt:5d} obs  ({100*cnt/len(observations):.1f}%)  {bar}")
 
-    plot_gallery(observations, labels, token_indices, top_tokens, 'plots/edits01/token_gallery.png')
-    plot_semantic_heatmap(labels, token_indices, 'plots/edits01/token_semantic_heatmap.png')
+    plot_gallery(observations, labels, token_indices, top_tokens, 'plots/edits02/token_gallery.png')
+    plot_semantic_heatmap(labels, token_indices, 'plots/edits02/token_semantic_heatmap.png')
 
-    print("\nAll done. Plots saved to plots/edits01/")
-
+    print("\nAll done. Plots saved to plots/edits02/")
 
 if __name__ == '__main__':
     main()
