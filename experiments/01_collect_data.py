@@ -1,7 +1,7 @@
 """
 Script 1 — Data Collection
 ===========================
-Collects random-policy trajectories from MiniGrid-DoorKey-5x5 and saves
+Collects random-policy trajectories from MiniGrid-Empty-5x5 and saves
 observations alongside ground-truth semantic state labels.
 
 The semantic labels are extracted from the environment's internal state
@@ -9,10 +9,9 @@ The semantic labels are extracted from the environment's internal state
 (probing in script 03) — the encoder is never trained with them.
 
 Labels collected:
-  door_open:     1 if the door is currently open
-  door_locked:   1 if the door is currently locked
-  carrying_key:  1 if the agent is carrying the key
-  key_on_ground: 1 if the key is still on the floor (not carried)
+  goal_visible:  1 if the goal tile (type=8) appears in the 7x7 observation
+  near_goal:     1 if Manhattan distance from agent to goal <= 2
+  facing_goal:   1 if agent's facing direction is aligned with goal direction
 
 Run first, before any other script.
 
@@ -36,44 +35,61 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-ENV_ID     = 'MiniGrid-DoorKey-5x5-v0'
+ENV_ID     = 'MiniGrid-Empty-5x5-v0'
 N_EPISODES = 600
-MAX_STEPS  = 100   # MiniGrid DoorKey-5x5 default horizon is 100
+MAX_STEPS  = 100   # MiniGrid Empty-5x5 default horizon is 100
 
 
 # ---------------------------------------------------------------------------
 # Semantic label extraction
 # ---------------------------------------------------------------------------
 
-def get_semantic_labels(env):
+def get_semantic_labels(env, obs_img):
     """
-    Read ground-truth symbolic state from MiniGrid's internal grid.
+    Read ground-truth symbolic state for MiniGrid-Empty-5x5.
     Called at every timestep; labels are NOT passed to the encoder.
+
+    goal_visible: goal tile (object type 8) is present in the 7x7 observation.
+    near_goal:    Manhattan distance from agent to goal <= 2.
+    facing_goal:  agent's facing direction is the primary direction toward the goal.
     """
-    grid     = env.unwrapped.grid
-    carrying = env.unwrapped.carrying
+    grid      = env.unwrapped.grid
+    agent_pos = env.unwrapped.agent_pos   # (x, y)
+    agent_dir = env.unwrapped.agent_dir   # 0=right, 1=down, 2=left, 3=up
 
-    labels = {
-        'door_open':     0,
-        'door_locked':   0,
-        'carrying_key':  0,
-        'key_on_ground': 0,
-    }
-
+    # Find goal cell (always present in Empty env)
+    goal_pos = None
     for x in range(grid.width):
         for y in range(grid.height):
             obj = grid.get(x, y)
-            if obj is None:
-                continue
-            if obj.type == 'door':
-                labels['door_open']   = int(obj.is_open)
-                labels['door_locked'] = int(obj.is_locked)
-            elif obj.type == 'key':
-                labels['key_on_ground'] = 1
+            if obj is not None and obj.type == 'goal':
+                goal_pos = (x, y)
+                break
+        if goal_pos is not None:
+            break
 
-    if carrying is not None and carrying.type == 'key':
-        labels['carrying_key']  = 1
-        labels['key_on_ground'] = 0
+    labels = {'goal_visible': 0, 'near_goal': 0, 'facing_goal': 0}
+
+    if goal_pos is None:
+        return labels
+
+    # goal_visible: object-type channel value 8 = GOAL tile
+    labels['goal_visible'] = int(np.any(obs_img[:, :, 0] == 8))
+
+    # near_goal: Manhattan distance
+    dist = abs(agent_pos[0] - goal_pos[0]) + abs(agent_pos[1] - goal_pos[1])
+    labels['near_goal'] = int(dist <= 2)
+
+    # facing_goal: agent direction matches the dominant axis toward goal
+    # dir 0=right(+x), 1=down(+y), 2=left(-x), 3=up(-y)
+    dx = goal_pos[0] - agent_pos[0]
+    dy = goal_pos[1] - agent_pos[1]
+    labels['facing_goal'] = int(
+        (agent_dir == 0 and dx > 0) or
+        (agent_dir == 1 and dy > 0) or
+        (agent_dir == 2 and dx < 0) or
+        (agent_dir == 3 and dy < 0)
+    )
 
     return labels
 
@@ -91,7 +107,7 @@ def collect_trajectories(env_id, n_episodes, max_steps, base_seed=42):
         img = obs['image']
 
         for _ in range(max_steps):
-            labels = get_semantic_labels(env)
+            labels = get_semantic_labels(env, img)
             observations.append(img.copy())
             label_list.append(labels)
 
@@ -126,7 +142,7 @@ def visualize(observations, labels, save_path):
     idxs = np.linspace(0, len(observations) - 1, n, dtype=int)
 
     fig, axes = plt.subplots(2, 5, figsize=(14, 6))
-    fig.suptitle('MiniGrid-DoorKey-5x5: Sample Observations', fontsize=11)
+    fig.suptitle('MiniGrid-Empty-5x5: Sample Observations', fontsize=11)
 
     for ax, idx in zip(axes.flat, idxs):
         img = observations[idx]
@@ -135,8 +151,8 @@ def visualize(observations, labels, save_path):
         display = np.clip(img[:, :, 0:1] * 25, 0, 255).repeat(3, axis=2).astype(np.uint8)
         ax.imshow(display, vmin=0, vmax=255)
         ax.set_title(
-            f"open={lbl['door_open']}  lock={lbl['door_locked']}\n"
-            f"carry={lbl['carrying_key']}",
+            f"vis={lbl['goal_visible']}  near={lbl['near_goal']}\n"
+            f"face={lbl['facing_goal']}",
             fontsize=7,
         )
         ax.axis('off')

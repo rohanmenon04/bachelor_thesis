@@ -67,7 +67,7 @@ from models import TransformerVQEncoder, D_MODEL, CODEBOOK_SIZE
 # Configuration
 # ---------------------------------------------------------------------------
 
-ENV_ID      = 'MiniGrid-DoorKey-5x5-v0'
+ENV_ID      = 'MiniGrid-Empty-5x5-v0'
 TOTAL_STEPS =  50_000
 EVAL_EVERY  =   5_000
 N_EVAL_EPS  =      10
@@ -334,7 +334,7 @@ def plot_results(f_results, save_path):
     ax.set_xlabel('Environment Steps', fontsize=12)
     ax.set_ylabel('Mean Episodic Return', fontsize=12)
     ax.set_title(
-        f'Condition F: Sentence Transformer — MiniGrid-DoorKey-5x5\n'
+        f'Condition F: Sentence Transformer — MiniGrid-Empty-5x5\n'
         f'({N_SEEDS} seed{"s" if N_SEEDS > 1 else ""}, {N_EVAL_EPS} eval episodes, '
         f'history={HISTORY_LEN}, layers={N_SENT_LAYERS}, heads={N_SENT_HEADS})',
         fontsize=11,

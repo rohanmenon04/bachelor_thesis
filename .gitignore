@@ -1,0 +1,16 @@
+# Generated experiment artifacts — regenerate by running scripts 01-08
+data/
+checkpoints/
+plots/
+results/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS
+.DS_Store
+
+# Temp Office lock files
+~$*

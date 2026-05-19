@@ -57,7 +57,7 @@ from models import TransformerVQEncoder, D_MODEL, CODEBOOK_SIZE
 # Configuration
 # ---------------------------------------------------------------------------
 
-ENV_ID        = 'MiniGrid-DoorKey-5x5-v0'
+ENV_ID        = 'MiniGrid-Empty-5x5-v0'
 TOTAL_STEPS   = 50_000
 EVAL_EVERY    =  5_000
 N_EVAL_EPS    =     10
@@ -477,7 +477,7 @@ def plot_results(lstm_results, cond_c_results, save_path):
     ax.set_ylabel('Mean Episodic Return', fontsize=12)
     ax.set_title(
         f'Condition E: LSTM over VQ Token Stream vs Condition C\n'
-        f'MiniGrid-DoorKey-5x5  '
+        f'MiniGrid-Empty-5x5  '
         f'({N_SEEDS} seed{"s" if N_SEEDS > 1 else ""}, {N_EVAL_EPS} eval episodes)',
         fontsize=11,
     )

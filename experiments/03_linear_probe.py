@@ -55,7 +55,7 @@ DEVICE     = ('cuda' if torch.cuda.is_available()
                else 'mps' if torch.backends.mps.is_available()
                else 'cpu')
 BATCH_SIZE = 512
-LABEL_KEYS = ['door_open', 'door_locked', 'carrying_key']
+LABEL_KEYS = ['goal_visible', 'near_goal', 'facing_goal']
 
 
 # ---------------------------------------------------------------------------
