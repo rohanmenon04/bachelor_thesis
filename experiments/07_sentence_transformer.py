@@ -38,11 +38,11 @@ Usage:
   python 07_sentence_transformer.py
 
 Requires:
-  checkpoints/edits01/vq_encoder.pt
+  checkpoints/vq_encoder/vq_encoder.pt
 
 Outputs:
-  results/edits04/transformer_sequence.npy   — (N_SEEDS, n_checkpoints) array
-  plots/edits04/transformer_sequence.png     — learning curve vs C / D / E
+  results/sentence_policy/transformer_sequence.npy   — (N_SEEDS, n_checkpoints) array
+  plots/sentence_policy/transformer_sequence.png     — learning curve vs C / D / E
 """
 
 import os
@@ -185,7 +185,7 @@ class SentenceTransformerExtractor(BaseFeaturesExtractor):
         # Frozen VQ encoder
         self.enc = TransformerVQEncoder()
         self.enc.load_state_dict(
-            torch.load('checkpoints/edits01/vq_encoder.pt', map_location='cpu')
+            torch.load('checkpoints/vq_encoder/vq_encoder.pt', map_location='cpu')
         )
         for p in self.enc.parameters():
             p.requires_grad = False
@@ -285,7 +285,7 @@ def train_condition_f(seed):
 def plot_results(f_results, save_path):
     """
     Plot Condition F against the prior conditions for direct comparison.
-    Loads C/D from results/edits02 and E from results/edits03 if available.
+    Loads C/D from results/ppo_baselines and E from results/lstm_policy if available.
     """
     fig, ax = plt.subplots(figsize=(11, 6))
     steps = np.arange(1, f_results.shape[1] + 1) * EVAL_EVERY
@@ -299,7 +299,7 @@ def plot_results(f_results, save_path):
                     color='#9b59b6', alpha=0.15)
 
     # --- Prior conditions (load if available) ---
-    edits02_path = 'results/edits02/ppo_returns.npy'
+    edits02_path = 'results/ppo_baselines/ppo_returns.npy'
     if os.path.exists(edits02_path):
         ppo_data = np.load(edits02_path, allow_pickle=True).item()
 
@@ -321,7 +321,7 @@ def plot_results(f_results, save_path):
             ax.fill_between(steps[:len(mean_d)], mean_d - std_d, mean_d + std_d,
                             color='#e67e22', alpha=0.10)
 
-    edits03_path = 'results/edits03/lstm_returns.npy'
+    edits03_path = 'results/lstm_policy/lstm_returns.npy'
     if os.path.exists(edits03_path):
         cond_e = np.load(edits03_path)
         mean_e = cond_e.mean(0)
@@ -352,8 +352,8 @@ def plot_results(f_results, save_path):
 # ---------------------------------------------------------------------------
 
 def main():
-    os.makedirs('results/edits04', exist_ok=True)
-    os.makedirs('plots/edits04',   exist_ok=True)
+    os.makedirs('results/sentence_policy', exist_ok=True)
+    os.makedirs('plots/sentence_policy',   exist_ok=True)
 
     n_params_sent = sum(
         p.numel() for p in
@@ -380,17 +380,17 @@ def main():
         seed_returns.append(rets)
 
     f_results = np.array(seed_returns)   # (N_SEEDS, n_ckpts)
-    np.save('results/edits04/transformer_sequence.npy', f_results)
-    print("\nSaved results/edits04/transformer_sequence.npy")
+    np.save('results/sentence_policy/transformer_sequence.npy', f_results)
+    print("\nSaved results/sentence_policy/transformer_sequence.npy")
 
-    plot_results(f_results, 'plots/edits04/transformer_sequence.png')
+    plot_results(f_results, 'plots/sentence_policy/transformer_sequence.png')
 
     print("\n=== Final Performance (last checkpoint) ===")
     m, s = f_results[:, -1].mean(), f_results[:, -1].std()
     print(f"  Condition F (Sentence Transformer): {m:.3f} ± {s:.3f}")
 
     # Print comparison if prior results available
-    edits02_path = 'results/edits02/ppo_returns.npy'
+    edits02_path = 'results/ppo_baselines/ppo_returns.npy'
     if os.path.exists(edits02_path):
         ppo_data = np.load(edits02_path, allow_pickle=True).item()
         for label, key in [('C (VQ-MLP)', 'C_Discrete_VQ'), ('D (Sentence-MLP)', 'D_Sentence_VQ')]:

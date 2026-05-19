@@ -25,8 +25,8 @@ Usage:
   python 04_ppo_comparison.py
 
 Requires:
-  checkpoints/edits01/vq_encoder.pt
-  checkpoints/edits01/continuous_encoder.pt
+  checkpoints/vq_encoder/vq_encoder.pt
+  checkpoints/vq_encoder/continuous_encoder.pt
 
 Outputs:
   results/ppo_returns.npy   — dict of {condition: (n_seeds, n_checkpoints)} arrays
@@ -173,7 +173,7 @@ class ContinuousExtractor(BaseFeaturesExtractor):
         super().__init__(observation_space, features_dim=LATENT_DIM)
         self.enc = ContinuousEncoder()
         self.enc.load_state_dict(
-            torch.load('checkpoints/edits01/continuous_encoder.pt', map_location='cpu')
+            torch.load('checkpoints/vq_encoder/continuous_encoder.pt', map_location='cpu')
         )
         for p in self.enc.parameters():
             p.requires_grad = False
@@ -201,7 +201,7 @@ class DiscreteVQExtractor(BaseFeaturesExtractor):
         super().__init__(observation_space, features_dim=D_MODEL)
         self.enc = TransformerVQEncoder()
         self.enc.load_state_dict(
-            torch.load('checkpoints/edits01/vq_encoder.pt', map_location='cpu')
+            torch.load('checkpoints/vq_encoder/vq_encoder.pt', map_location='cpu')
         )
         for p in self.enc.parameters():
             p.requires_grad = False
@@ -248,7 +248,7 @@ class SentenceExtractor(BaseFeaturesExtractor):
 
         self.enc = TransformerVQEncoder()
         self.enc.load_state_dict(
-            torch.load('checkpoints/edits01/vq_encoder.pt', map_location='cpu')
+            torch.load('checkpoints/vq_encoder/vq_encoder.pt', map_location='cpu')
         )
         for p in self.enc.parameters():
             p.requires_grad = False
@@ -382,8 +382,8 @@ def plot_comparison(all_results, save_path):
 # ---------------------------------------------------------------------------
 
 def main():
-    os.makedirs('results/edits02', exist_ok=True)
-    os.makedirs('plots/edits02',   exist_ok=True)
+    os.makedirs('results/ppo_baselines', exist_ok=True)
+    os.makedirs('plots/ppo_baselines',   exist_ok=True)
 
     all_results = {}
 
@@ -399,10 +399,10 @@ def main():
 
         all_results[cond_name] = np.array(seed_returns)  # (N_SEEDS, n_ckpts)
 
-    np.save('results/edits02/ppo_returns.npy', all_results, allow_pickle=True)
-    print("\nSaved results/edits02/ppo_returns.npy")
+    np.save('results/ppo_baselines/ppo_returns.npy', all_results, allow_pickle=True)
+    print("\nSaved results/ppo_baselines/ppo_returns.npy")
 
-    plot_comparison(all_results, 'plots/edits02/ppo_comparison.png')
+    plot_comparison(all_results, 'plots/ppo_baselines/ppo_comparison.png')
 
     print("\n=== Final Performance (last checkpoint) ===")
     for cond, arr in all_results.items():

@@ -29,11 +29,11 @@ Usage:
   python 06_lstm_ppo.py
 
 Requires:
-  checkpoints/edits01/vq_encoder.pt
+  checkpoints/vq_encoder/vq_encoder.pt
 
 Outputs:
-  results/edits03/lstm_returns.npy   — (N_SEEDS, n_checkpoints) array
-  plots/edits03/lstm_comparison.png  — LSTM vs Condition C learning curve
+  results/lstm_policy/lstm_returns.npy   — (N_SEEDS, n_checkpoints) array
+  plots/lstm_policy/lstm_comparison.png  — LSTM vs Condition C learning curve
 """
 
 import os
@@ -121,7 +121,7 @@ class FrozenVQEncoder(nn.Module):
     No gradient flows through this module during policy training.
     """
 
-    def __init__(self, ckpt_path='checkpoints/edits01/vq_encoder.pt'):
+    def __init__(self, ckpt_path='checkpoints/vq_encoder/vq_encoder.pt'):
         super().__init__()
         self.enc = TransformerVQEncoder()
         self.enc.load_state_dict(torch.load(ckpt_path, map_location='cpu'))
@@ -494,8 +494,8 @@ def plot_results(lstm_results, cond_c_results, save_path):
 # ---------------------------------------------------------------------------
 
 def main():
-    os.makedirs('results/edits03', exist_ok=True)
-    os.makedirs('plots/edits03',   exist_ok=True)
+    os.makedirs('results/lstm_policy', exist_ok=True)
+    os.makedirs('plots/lstm_policy',   exist_ok=True)
 
     print(f"=== Condition E: LSTM over VQ Token Stream ===")
     print(f"LSTM hidden: {LSTM_HIDDEN}  |  D_MODEL: {D_MODEL}  |  Total steps: {TOTAL_STEPS:,}")
@@ -509,19 +509,19 @@ def main():
         seed_returns.append(rets)
 
     lstm_results = np.array(seed_returns)   # (N_SEEDS, n_ckpts)
-    np.save('results/edits03/lstm_returns.npy', lstm_results)
-    print("\nSaved results/edits03/lstm_returns.npy")
+    np.save('results/lstm_policy/lstm_returns.npy', lstm_results)
+    print("\nSaved results/lstm_policy/lstm_returns.npy")
 
     # Load Condition C from previous experiment if available
     cond_c = None
-    ppo_path = 'results/edits02/ppo_returns.npy'
+    ppo_path = 'results/ppo_baselines/ppo_returns.npy'
     if os.path.exists(ppo_path):
         ppo_data = np.load(ppo_path, allow_pickle=True).item()
         cond_c = ppo_data.get('C_Discrete_VQ')
         if cond_c is not None:
             print("Loaded Condition C results for comparison.")
 
-    plot_results(lstm_results, cond_c, 'plots/edits03/lstm_comparison.png')
+    plot_results(lstm_results, cond_c, 'plots/lstm_policy/lstm_comparison.png')
 
     print("\n=== Final Performance (last checkpoint) ===")
     m, s = lstm_results[:, -1].mean(), lstm_results[:, -1].std()
