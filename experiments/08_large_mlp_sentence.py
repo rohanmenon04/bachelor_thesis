@@ -55,7 +55,7 @@ from models import TransformerVQEncoder, D_MODEL
 # Configuration
 # ---------------------------------------------------------------------------
 
-ENV_ID      = 'MiniGrid-Empty-5x5-v0'
+ENV_ID      = 'MiniGrid-FourRooms-v0'
 TOTAL_STEPS =  50_000
 EVAL_EVERY  =   5_000
 N_EVAL_EPS  =      10
@@ -255,7 +255,7 @@ def plot_results(results, save_path):
     ax.set_ylabel('Mean Episodic Return', fontsize=12)
     ax.set_title(
         f'Condition D revisited: Sentence MLP with larger policy network\n'
-        f'MiniGrid-Empty-5x5  |  {N_SEEDS} seeds  |  '
+        f'MiniGrid-FourRooms  |  {N_SEEDS} seeds  |  '
         f'input=512-dim  net_arch={NET_ARCH}',
         fontsize=11,
     )

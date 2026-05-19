@@ -4,8 +4,8 @@ Script 5 — Token Visualization (Qualitative Interpretability)
 For each active codebook entry, finds the observations that activate it
 most frequently and shows them in a gallery grid.
 
-If a token consistently activates for observations where "goal_visible=1"
-and "near_goal=1", that is qualitative evidence of semantic structure.
+If a token consistently activates for observations where "in_goal_room=1"
+and "goal_visible=1", that is qualitative evidence of semantic structure.
 
 This supports RQ5 (interpretability) in the thesis: do tokens correspond
 to visually and semantically coherent state clusters?
@@ -93,7 +93,7 @@ def semantic_summary(obs_indices, labels, label_keys):
 # ---------------------------------------------------------------------------
 
 def plot_gallery(observations, labels, token_indices, top_tokens, save_path):
-    label_keys = ['goal_visible', 'near_goal', 'facing_goal']
+    label_keys = ['in_goal_room', 'facing_goal', 'goal_visible']
     n_rows = len(top_tokens)
     n_cols = N_NEIGHBORS + 1   # left column: token info text
 
@@ -142,7 +142,7 @@ def plot_gallery(observations, labels, token_indices, top_tokens, save_path):
 # ---------------------------------------------------------------------------
 
 def plot_semantic_heatmap(labels, token_indices, save_path):
-    label_keys = ['goal_visible', 'near_goal', 'facing_goal']
+    label_keys = ['in_goal_room', 'facing_goal', 'goal_visible']
     active_tokens = np.unique(token_indices)
 
     # Build matrix: (n_active, n_labels) = mean positive rate per token per label

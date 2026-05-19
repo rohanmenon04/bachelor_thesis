@@ -1,7 +1,7 @@
 """
 Script 1 — Data Collection
 ===========================
-Collects random-policy trajectories from MiniGrid-Empty-5x5 and saves
+Collects random-policy trajectories from MiniGrid-FourRooms-v0 and saves
 observations alongside ground-truth semantic state labels.
 
 The semantic labels are extracted from the environment's internal state
@@ -9,9 +9,9 @@ The semantic labels are extracted from the environment's internal state
 (probing in script 03) — the encoder is never trained with them.
 
 Labels collected:
-  goal_visible:  1 if the goal tile (type=8) appears in the 7x7 observation
-  near_goal:     1 if Manhattan distance from agent to goal <= 2
+  in_goal_room:  1 if the agent is in the same quadrant of the grid as the goal
   facing_goal:   1 if agent's facing direction is aligned with goal direction
+  goal_visible:  1 if the goal tile (type=8) appears in the 7x7 observation
 
 Run first, before any other script.
 
@@ -35,9 +35,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-ENV_ID     = 'MiniGrid-Empty-5x5-v0'
-N_EPISODES = 600
-MAX_STEPS  = 100   # MiniGrid Empty-5x5 default horizon is 100
+ENV_ID     = 'MiniGrid-FourRooms-v0'
+N_EPISODES = 300   # reduced vs simpler envs — FourRooms episodes run to 500 steps
+MAX_STEPS  = 500   # MiniGrid FourRooms default horizon is 500
 
 
 # ---------------------------------------------------------------------------
@@ -46,18 +46,21 @@ MAX_STEPS  = 100   # MiniGrid Empty-5x5 default horizon is 100
 
 def get_semantic_labels(env, obs_img):
     """
-    Read ground-truth symbolic state for MiniGrid-Empty-5x5.
+    Read ground-truth symbolic state for MiniGrid-FourRooms-v0.
     Called at every timestep; labels are NOT passed to the encoder.
 
-    goal_visible: goal tile (object type 8) is present in the 7x7 observation.
-    near_goal:    Manhattan distance from agent to goal <= 2.
+    in_goal_room: agent occupies the same grid quadrant as the goal.
+                  FourRooms is divided by walls at (width//2, height//2);
+                  quadrant membership is a high-level navigation progress signal
+                  analogous to 'carrying_key' in DoorKey.
     facing_goal:  agent's facing direction is the primary direction toward the goal.
+    goal_visible: goal tile (object type 8) is present in the 7x7 observation.
     """
     grid      = env.unwrapped.grid
     agent_pos = env.unwrapped.agent_pos   # (x, y)
     agent_dir = env.unwrapped.agent_dir   # 0=right, 1=down, 2=left, 3=up
 
-    # Find goal cell (always present in Empty env)
+    # Find goal cell
     goal_pos = None
     for x in range(grid.width):
         for y in range(grid.height):
@@ -68,17 +71,17 @@ def get_semantic_labels(env, obs_img):
         if goal_pos is not None:
             break
 
-    labels = {'goal_visible': 0, 'near_goal': 0, 'facing_goal': 0}
+    labels = {'in_goal_room': 0, 'facing_goal': 0, 'goal_visible': 0}
 
     if goal_pos is None:
         return labels
 
-    # goal_visible: object-type channel value 8 = GOAL tile
-    labels['goal_visible'] = int(np.any(obs_img[:, :, 0] == 8))
-
-    # near_goal: Manhattan distance
-    dist = abs(agent_pos[0] - goal_pos[0]) + abs(agent_pos[1] - goal_pos[1])
-    labels['near_goal'] = int(dist <= 2)
+    # in_goal_room: same grid quadrant as goal (walls sit at the midpoint indices)
+    mid_x = grid.width  // 2
+    mid_y = grid.height // 2
+    agent_room = (int(agent_pos[0] >= mid_x), int(agent_pos[1] >= mid_y))
+    goal_room  = (int(goal_pos[0]  >= mid_x), int(goal_pos[1]  >= mid_y))
+    labels['in_goal_room'] = int(agent_room == goal_room)
 
     # facing_goal: agent direction matches the dominant axis toward goal
     # dir 0=right(+x), 1=down(+y), 2=left(-x), 3=up(-y)
@@ -90,6 +93,9 @@ def get_semantic_labels(env, obs_img):
         (agent_dir == 2 and dx < 0) or
         (agent_dir == 3 and dy < 0)
     )
+
+    # goal_visible: object-type channel value 8 = GOAL tile in 7x7 view
+    labels['goal_visible'] = int(np.any(obs_img[:, :, 0] == 8))
 
     return labels
 
@@ -142,7 +148,7 @@ def visualize(observations, labels, save_path):
     idxs = np.linspace(0, len(observations) - 1, n, dtype=int)
 
     fig, axes = plt.subplots(2, 5, figsize=(14, 6))
-    fig.suptitle('MiniGrid-Empty-5x5: Sample Observations', fontsize=11)
+    fig.suptitle('MiniGrid-FourRooms: Sample Observations', fontsize=11)
 
     for ax, idx in zip(axes.flat, idxs):
         img = observations[idx]
@@ -151,8 +157,8 @@ def visualize(observations, labels, save_path):
         display = np.clip(img[:, :, 0:1] * 25, 0, 255).repeat(3, axis=2).astype(np.uint8)
         ax.imshow(display, vmin=0, vmax=255)
         ax.set_title(
-            f"vis={lbl['goal_visible']}  near={lbl['near_goal']}\n"
-            f"face={lbl['facing_goal']}",
+            f"room={lbl['in_goal_room']}  face={lbl['facing_goal']}\n"
+            f"vis={lbl['goal_visible']}",
             fontsize=7,
         )
         ax.axis('off')
