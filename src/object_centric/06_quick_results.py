@@ -54,7 +54,7 @@ def main():
 
     # Per-seed breakdown for key conditions
     print()
-    for name in ['OC-All', 'OC-All+Pos']:
+    for name in ['OC-All', 'OC-All+Pos', 'OC-All-Disc']:
         if name not in r:
             continue
         v = r[name]

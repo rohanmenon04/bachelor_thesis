@@ -38,7 +38,7 @@ EMA_DECAY           = 0.99   # decay factor for EMA codebook update
 DEAD_CODE_THRESHOLD = 1.0    # EMA cluster-size below this triggers code restart
 
 # Spatial VQ encoder hyperparameters (Condition I: Dual-VQ)
-SPATIAL_CODEBOOK_SIZE =64   # K=32 codes cover the 5x5 playable area with headroom
+SPATIAL_CODEBOOK_SIZE = 32   # one code per reachable cell in DoorKey-5x5 (25 cells)
 SPATIAL_LATENT_DIM    = 32   # spatial token embedding width
 SPATIAL_GRID_SIZE     = 5    # DoorKey-5x5 world is 5×5; positions are ints in [0, 5)
 

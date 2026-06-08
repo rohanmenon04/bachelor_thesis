@@ -57,12 +57,13 @@ DEVICE = (
 LABEL_KEYS = ['door_open', 'door_locked', 'carrying_key']
 
 CONDITION_STYLE = {
-    'Raw':        {'color': 'black',    'label': 'Raw obs (147-dim)',              'lw': 2.0, 'ls': '-'},
-    'OC-Agent':   {'color': '#4c9be8',  'label': 'OC-Agent: CLS token (64-dim)',  'lw': 1.5, 'ls': '--'},
-    'OC-All':     {'color': '#f4a261',  'label': 'OC-All: agent+key+door (192-dim)', 'lw': 1.5, 'ls': '-'},
-    'OC-All+Pos': {'color': '#2ecc71',  'label': 'OC-All+Pos: tokens+pos (194-dim)', 'lw': 2.0, 'ls': '-'},
+    'Raw':          {'color': 'black',   'label': 'Raw obs (147-dim)',                    'lw': 2.0, 'ls': '-'},
+    'OC-Agent':     {'color': '#4c9be8', 'label': 'OC-Agent: CLS token (64-dim)',         'lw': 1.5, 'ls': '--'},
+    'OC-All':       {'color': '#f4a261', 'label': 'OC-All: semantic only (192-dim)',       'lw': 1.5, 'ls': '-'},
+    'OC-All+Pos':   {'color': '#aaaaaa', 'label': 'OC-All+Pos: oracle position (194-dim, ablation)', 'lw': 1.5, 'ls': '--'},
+    'OC-All-Disc':  {'color': '#2ecc71', 'label': 'OC-All-Disc: fully discrete (224-dim)', 'lw': 2.0, 'ls': '-'},
 }
-PLOT_ORDER = ['Raw', 'OC-Agent', 'OC-All', 'OC-All+Pos']
+PLOT_ORDER = ['Raw', 'OC-Agent', 'OC-All', 'OC-All+Pos', 'OC-All-Disc']
 
 
 # ---------------------------------------------------------------------------

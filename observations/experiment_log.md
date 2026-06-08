@@ -1278,3 +1278,71 @@ Identical hyperparameters to OC-All (`ent_coef=0.05`, `net_arch=[64,64]`). Polic
 - *Does planning over discrete tokens improve sample efficiency?* **Yes, when position signal is provided** — OC-All+Pos achieves 0.958 return comparable to raw observations (0.965), at 200k steps
 - *How interpretable are the tokens?* The codebook has learned human-interpretable binary partitions for task-critical states, not just statistical associations
 - *Limitation*: Without position (OC-All alone), the spatial information gap causes high bootstrapping variance. Replacing oracle position with a spatial VQ token is the natural next step.
+
+---
+
+## 21. OC-All-Disc — Fully Discrete Representation (No Oracle)
+
+**Date:** 2026-06-08
+**Script:** `src/object_centric/08_ppo_oc_full_discrete.py`
+**Results:** `results/object_centric/ppo_returns.npy` (key: `OC-All-Disc`)
+**Status:** Running (5 seeds × 200k steps)
+
+### 21.1 Motivation — Why OC-All+Pos Defeats the Purpose
+
+Section 20 (OC-All+Pos) added oracle agent position as raw continuous floats (col/4, row/4) to the OC tokens. This produced strong results (0.307 mean, seed 3 = 0.958) but is conceptually unsatisfying: the continuous floats bypass the discrete bottleneck entirely, contradicting the thesis claim that the representation is discrete.
+
+The correct fix: replace the oracle float with a discrete position token.
+
+### 21.2 Why VQSpatialEncoder Was Unsuitable
+
+Attempts to train `VQSpatialEncoder` (K=32, 40 epochs) consistently collapsed to ~15 unique tokens for 25 cells (perplexity 5.4/32 = 17%). The root cause is structural:
+- Only 25 distinct input points exist in the embedding space
+- EMA dead-code restart reinitialises dead codes to one of those 25 points
+- Restarted codes compete with existing active codes for the same inputs
+- The competition is perpetual — with K=32 and only 25 distinct inputs, 7 codes are always structurally dead
+- Result: collapse to 5–6 effectively active codes regardless of training duration
+
+VQ is designed to discretise **continuous** high-dimensional distributions (images, audio). For an already-discrete, low-cardinality space (integer grid coordinates), it is the wrong tool.
+
+### 21.3 Why PositionEmbeddingEncoder Is the Right Tool
+
+Position in DoorKey-5x5 is already discrete: the agent occupies one of 25 integer grid cells. The natural discrete representation is a **direct embedding lookup**: cell_index → 32-dim vector. This is:
+- Guaranteed 25 unique tokens (one per cell, bijective mapping by construction)
+- No collapse possible (each index is its own unique key)
+- Same information structure as VQ tokens: integer index → codebook embedding
+- The VQ mechanism exists to *create* discrete indices from continuous inputs — for position, the discrete index already exists
+
+The `PositionEmbeddingEncoder` (`models.py`) encodes (x, y) as flat index `x * GRID_SIZE + y`, then looks up a 32-dim trainable embedding. The embedding is pre-trained on position reconstruction (checkpoint `spatial_pos_encoder.pt`).
+
+### 21.4 Architecture — OC-All-Disc
+
+```
+obs (7×7×3) → frozen OC encoder:
+    CLS token  → agent VQ head (K=64) → e_agent (64-dim)  ← discrete VQ bottleneck
+    key cell   →   key VQ head (K=16) →   e_key (64-dim)  ← discrete VQ bottleneck
+    door cell  →  door VQ head  (K=8) →  e_door (64-dim)  ← discrete VQ bottleneck
+
+agent_pos (x, y) → frozen PositionEmbeddingEncoder:
+    flat_idx = x * 5 + y ∈ [0, 24] → e_pos (32-dim)       ← discrete embedding
+
+concat → 224-dim → [64, 64] MLP → π
+```
+
+**Fully discrete property:** Every dimension of the 224-dim policy input is derived exclusively through a discrete integer index (either a VQ code or a grid cell index). No continuous oracle information is passed.
+
+**Comparison with OC-All+Pos:**
+- OC-All+Pos: `e_agent + e_key + e_door` (192) + `(col/4, row/4)` (2) = 194-dim
+  - Position: exact continuous floats — oracle, no information loss
+- OC-All-Disc: `e_agent + e_key + e_door` (192) + `cell_embed[x*5+y]` (32) = 224-dim
+  - Position: discrete cell embedding — fully through bottleneck, no oracle
+
+### 21.5 Results
+
+[TO BE FILLED AFTER TRAINING COMPLETES]
+
+### 21.6 Interpretation
+
+If OC-All-Disc ≈ OC-All+Pos: the position embedding lookup is as informative as raw floats for policy learning — the discrete bottleneck has zero cost.
+
+If OC-All-Disc < OC-All+Pos: the embedding representation loses some positional precision. The gap quantifies the cost of discretization, which could be reduced by increasing `SPATIAL_LATENT_DIM` or fine-tuning the position encoder jointly with PPO.
