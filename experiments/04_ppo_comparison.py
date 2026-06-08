@@ -57,17 +57,20 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from models import (
     ContinuousEncoder,
     TransformerVQEncoder,
+    VQSpatialEncoder,
     CODEBOOK_SIZE,
     D_MODEL,
     LATENT_DIM,
+    SPATIAL_LATENT_DIM,
 )
 
 ENV_ID      = 'MiniGrid-DoorKey-5x5-v0'
-TOTAL_STEPS =  50_000
+TOTAL_STEPS = 200_000   # Condition H: extended budget per architecture proposal §3.2
 EVAL_EVERY  =   5_000
 N_EVAL_EPS  =      10
 N_SEEDS     =       2   # set to 5 for final results
 HISTORY_LEN =       7   # past frames in sentence; sentence length = HISTORY_LEN + 1
+GRID_SIZE   =       5   # DoorKey-5x5: positions range 0..GRID_SIZE-1 ⇒ normalise by 4
 
 
 # ---------------------------------------------------------------------------
@@ -143,6 +146,56 @@ def make_env_sentence(seed=0):
     env = gym.make(ENV_ID)
     env = ImgObsWrapper(env)
     env = HistoryWrapper(env)
+    env = Monitor(env)
+    env.reset(seed=seed)
+    return env
+
+
+class PositionObsWrapper(gym.ObservationWrapper):
+    """
+    Augments the MiniGrid observation with the agent's true world-frame
+    position (Condition G / I). Returns a Dict observation:
+        {
+            'image': (7, 7, 3) float32 — partial egocentric view,
+            'pos':   (2,)     float32 — normalised (col, row) in [0, 1],
+        }
+
+    Position is read from ``env.unwrapped.agent_pos`` rather than being
+    extracted from the image. MiniGrid's default partial observation does
+    not render the agent in its own view, so the obs image alone does not
+    carry world-frame position information. ``agent_pos`` is the
+    ground-truth oracle position used by the proposal as the spatial signal.
+    """
+
+    def __init__(self, env):
+        super().__init__(env)
+        img_space = env.observation_space['image']
+        self.observation_space = gym.spaces.Dict({
+            'image': gym.spaces.Box(
+                low=0.0, high=float(img_space.high.max()),
+                shape=img_space.shape, dtype=np.float32,
+            ),
+            'pos': gym.spaces.Box(
+                low=0.0, high=1.0, shape=(2,), dtype=np.float32,
+            ),
+        })
+        self._norm = float(GRID_SIZE - 1)        # 4 for DoorKey-5x5
+
+    def observation(self, obs):
+        ax, ay = self.env.unwrapped.agent_pos      # (col, row)
+        pos = np.array(
+            [ax / self._norm, ay / self._norm],
+            dtype=np.float32,
+        )
+        return {
+            'image': obs['image'].astype(np.float32),
+            'pos':   pos,
+        }
+
+
+def make_env_position(seed=0):
+    env = gym.make(ENV_ID)
+    env = PositionObsWrapper(env)
     env = Monitor(env)
     env.reset(seed=seed)
     return env
@@ -271,35 +324,148 @@ class SentenceExtractor(BaseFeaturesExtractor):
         return emb.reshape(B, self.n_tokens * D_MODEL)
 
 
+class PositionAugmentedVQExtractor(BaseFeaturesExtractor):
+    """
+    Condition G: frozen VQ codebook embedding (64-dim) ⊕ oracle agent
+    position (2-dim). features_dim = D_MODEL + 2 = 66.
+
+    Operates on a Dict observation produced by ``PositionObsWrapper``. The
+    semantic encoder receives only the image, and the position is appended
+    directly without any learned projection. This isolates the spatial
+    information contribution: G vs C measures exactly what oracle position
+    adds to the semantic token.
+    """
+
+    def __init__(self, observation_space):
+        super().__init__(observation_space, features_dim=D_MODEL + 2)
+        self.enc = TransformerVQEncoder()
+        self.enc.load_state_dict(
+            torch.load('checkpoints/vq_encoder/vq_encoder.pt', map_location='cpu')
+        )
+        for p in self.enc.parameters():
+            p.requires_grad = False
+        self.enc.eval()
+
+    def train(self, mode=True):
+        super().train(mode)
+        self.enc.eval()
+        return self
+
+    def forward(self, obs):
+        image = obs['image']                            # (B, 7, 7, 3) float32
+        pos   = obs['pos']                              # (B, 2)       float32
+        with torch.no_grad():
+            z         = self.enc.encode(image.long())
+            _, idx, _ = self.enc.vq(z)
+            emb       = self.enc.vq.codebook(idx)       # (B, D_MODEL)
+        return torch.cat([emb, pos], dim=1)             # (B, 66)
+
+
+class DualVQExtractor(BaseFeaturesExtractor):
+    """
+    Condition I: dual-VQ fully-discrete state representation.
+
+    Combines two independently trained VQ encoders:
+      - TransformerVQEncoder (semantic):  obs    → 64-dim codebook embedding
+      - VQSpatialEncoder    (spatial):    pos_2d → 32-dim codebook embedding
+
+    features_dim = D_MODEL + SPATIAL_LATENT_DIM = 64 + 32 = 96.
+
+    The two encoders' codebook embeddings are concatenated. Both encoders
+    are frozen during PPO training. No continuous components appear in the
+    pipeline downstream of the encoder lookups — the only continuous
+    quantities are the codebook embedding tables themselves.
+    """
+
+    def __init__(self, observation_space):
+        super().__init__(
+            observation_space, features_dim=D_MODEL + SPATIAL_LATENT_DIM,
+        )
+
+        self.enc = TransformerVQEncoder()
+        self.enc.load_state_dict(
+            torch.load('checkpoints/vq_encoder/vq_encoder.pt', map_location='cpu')
+        )
+        for p in self.enc.parameters():
+            p.requires_grad = False
+        self.enc.eval()
+
+        self.spatial = VQSpatialEncoder()
+        self.spatial.load_state_dict(
+            torch.load('checkpoints/vq_encoder/vq_spatial.pt', map_location='cpu')
+        )
+        for p in self.spatial.parameters():
+            p.requires_grad = False
+        self.spatial.eval()
+
+    def train(self, mode=True):
+        super().train(mode)
+        self.enc.eval()
+        self.spatial.eval()
+        return self
+
+    def forward(self, obs):
+        image = obs['image']                            # (B, 7, 7, 3) float32
+        pos   = obs['pos']                              # (B, 2)       float32
+        with torch.no_grad():
+            # Semantic token (what)
+            z_sem         = self.enc.encode(image.long())
+            _, idx_sem, _ = self.enc.vq(z_sem)
+            emb_sem       = self.enc.vq.codebook(idx_sem)        # (B, D_MODEL)
+
+            # Spatial token (where)
+            z_sp          = self.spatial.encode(pos)
+            _, idx_sp, _  = self.spatial.vq(z_sp)
+            emb_sp        = self.spatial.vq.codebook(idx_sp)     # (B, SPATIAL_LATENT_DIM)
+
+        return torch.cat([emb_sem, emb_sp], dim=1)               # (B, 96)
+
+
 # ---------------------------------------------------------------------------
 # Training
 # ---------------------------------------------------------------------------
 
 CONDITIONS = {
     'A_Raw': {
-        'extractor': RawExtractor,
-        'kwargs':    {},
-        'make_env':  make_env,
+        'extractor':   RawExtractor,
+        'kwargs':      {},
+        'make_env':    make_env,
+        'policy_type': 'MlpPolicy',
     },
     'B_Continuous': {
-        'extractor': ContinuousExtractor,
-        'kwargs':    {},
-        'make_env':  make_env,
+        'extractor':   ContinuousExtractor,
+        'kwargs':      {},
+        'make_env':    make_env,
+        'policy_type': 'MlpPolicy',
     },
     'C_Discrete_VQ': {
-        'extractor': DiscreteVQExtractor,
-        'kwargs':    {},
-        'make_env':  make_env,
+        'extractor':   DiscreteVQExtractor,
+        'kwargs':      {},
+        'make_env':    make_env,
+        'policy_type': 'MlpPolicy',
     },
     'D_Sentence_VQ': {
-        'extractor': SentenceExtractor,
-        'kwargs':    {},
-        'make_env':  make_env_sentence,
+        'extractor':   SentenceExtractor,
+        'kwargs':      {},
+        'make_env':    make_env_sentence,
+        'policy_type': 'MlpPolicy',
+    },
+    'G_Position_Augmented_VQ': {
+        'extractor':   PositionAugmentedVQExtractor,
+        'kwargs':      {},
+        'make_env':    make_env_position,
+        'policy_type': 'MultiInputPolicy',
+    },
+    'I_Dual_VQ': {
+        'extractor':   DualVQExtractor,
+        'kwargs':      {},
+        'make_env':    make_env_position,
+        'policy_type': 'MultiInputPolicy',
     },
 }
 
 
-def train_condition(name, extractor_cls, extractor_kwargs, env_factory, seed):
+def train_condition(name, extractor_cls, extractor_kwargs, env_factory, policy_type, seed):
     env      = env_factory(seed)
     eval_env = env_factory(seed + 10_000)
 
@@ -310,7 +476,7 @@ def train_condition(name, extractor_cls, extractor_kwargs, env_factory, seed):
     }
 
     model = PPO(
-        'MlpPolicy', env,
+        policy_type, env,
         policy_kwargs=policy_kwargs,
         learning_rate=3e-4,
         n_steps=512,
@@ -342,16 +508,20 @@ def plot_comparison(all_results, save_path):
 
     steps  = np.arange(1, len(list(all_results.values())[0][0]) + 1) * EVAL_EVERY
     colors = {
-        'A_Raw':         '#4c9be8',
-        'B_Continuous':  '#f4a261',
-        'C_Discrete_VQ': '#2ecc71',
-        'D_Sentence_VQ': '#9b59b6',
+        'A_Raw':                   '#4c9be8',
+        'B_Continuous':            '#f4a261',
+        'C_Discrete_VQ':           '#2ecc71',
+        'D_Sentence_VQ':           '#9b59b6',
+        'G_Position_Augmented_VQ': '#e74c3c',
+        'I_Dual_VQ':               '#1abc9c',
     }
     names  = {
-        'A_Raw':         'A: Raw observations',
-        'B_Continuous':  'B: Continuous AE (frozen)',
-        'C_Discrete_VQ': 'C: Discrete VQ (single token, frozen)',
-        'D_Sentence_VQ': 'D: Sentence VQ (history + anchor, frozen)',
+        'A_Raw':                   'A: Raw observations',
+        'B_Continuous':            'B: Continuous AE (frozen)',
+        'C_Discrete_VQ':           'C: Discrete VQ (single token, frozen)',
+        'D_Sentence_VQ':           'D: Sentence VQ (history + anchor, frozen)',
+        'G_Position_Augmented_VQ': 'G: VQ token + oracle position (frozen)',
+        'I_Dual_VQ':               'I: Dual-VQ (semantic ⊕ spatial token, frozen)',
     }
 
     for cond, arr in all_results.items():
@@ -394,7 +564,12 @@ def main():
         for seed_i in range(N_SEEDS):
             seed = seed_i * 100
             print(f"  Seed {seed_i} (seed={seed}):")
-            rets = train_condition(cond_name, cfg['extractor'], cfg['kwargs'], cfg['make_env'], seed)
+            rets = train_condition(
+                cond_name,
+                cfg['extractor'], cfg['kwargs'],
+                cfg['make_env'], cfg['policy_type'],
+                seed,
+            )
             seed_returns.append(rets)
 
         all_results[cond_name] = np.array(seed_returns)  # (N_SEEDS, n_ckpts)
