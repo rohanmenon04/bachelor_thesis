@@ -1339,10 +1339,53 @@ concat → 224-dim → [64, 64] MLP → π
 
 ### 21.5 Results
 
-[TO BE FILLED AFTER TRAINING COMPLETES]
+**Final results (5 seeds × 200k steps): OC-All-Disc = 0.768 ± 0.158**
 
-### 21.6 Interpretation
+| Seed | Final | Max | Bootstrap step | vs OC-All+Pos |
+|------|:-----:|:---:|:--------------:|:-------------|
+| 0 | 0.678 | 0.970 | ~70k | ∞ (OC-All+Pos seed 0 = 0.000) |
+| 1 | 0.579 | 0.967 | ~55k | 2.0× (was 0.291) |
+| 2 | 0.956 | 0.964 | ~50k | 3.3× (was 0.287) |
+| 3 | 0.672 | 0.861 | ~45k | 0.70× (OC-All+Pos seed 3 was 0.958) |
+| 4 | **0.958** | 0.962 | ~85k | ∞ (OC-All+Pos seed 4 = 0.000) |
 
-If OC-All-Disc ≈ OC-All+Pos: the position embedding lookup is as informative as raw floats for policy learning — the discrete bottleneck has zero cost.
+**Mean: 0.768 ± 0.158** (vs OC-All+Pos: 0.307 ± 0.350) — **2.50× improvement**
 
-If OC-All-Disc < OC-All+Pos: the embedding representation loses some positional precision. The gap quantifies the cost of discretization, which could be reduced by increasing `SPATIAL_LATENT_DIM` or fine-tuning the position encoder jointly with PPO.
+| Metric | OC-All | OC-All+Pos | OC-All-Disc |
+|--------|:------:|:----------:|:-----------:|
+| Mean final @200k | 0.116 | 0.307 | **0.768** |
+| Std | 0.188 | 0.350 | **0.158** |
+| Bootstrap rate | 2/5 | 4/5 | **5/5** |
+| Mean max/seed | 0.174 | 0.521 | **0.945** |
+| Best seed final | 0.485 | 0.958 | **0.958** |
+
+**Bootstrap timing**: OC-All-Disc seeds bootstrap at 45k–85k steps (all within 200k budget). This is faster and more reliable than OC-All+Pos (35k–180k for 4/5 seeds, never for 1 seed).
+
+### 21.6 Surprising Finding: Discrete Embedding > Oracle Floats
+
+OC-All-Disc (**0.768**) significantly outperforms the oracle ablation OC-All+Pos (**0.307**), contradicting the expectation that raw continuous coordinates would provide maximum position information.
+
+**Explanation:** The 32-dim pre-trained embedding provides richer features for the policy MLP than 2 raw float coordinates, for three reasons:
+
+1. **Dimensionality**: 32 weakly-correlated features > 2 exact features for MLP learning. The policy has 30 more input dimensions from which to construct action-position associations, even if individual dimensions are less "exact" than raw coordinates.
+
+2. **Pre-trained structure**: The embedding was trained to decode (x, y) coordinates via cross-entropy reconstruction. Each dimension encodes a spatial "projection" that is easier for the policy to learn from than abstract floating-point values.
+
+3. **Scale compatibility**: Embedding norms (~4) are similar to semantic token codebook embedding norms, making the 224-dim concatenated input more balanced than the 194-dim input where 2 small-scale floats are concatenated with 192-dim codebook vectors.
+
+This finding is consistent with the general principle in representation learning that **pre-trained distributed representations outperform raw inputs for downstream learning** — analogous to why word embeddings outperform one-hot encodings, or image feature vectors outperform raw pixels for transfer learning.
+
+**Lower variance** (std=0.158 vs 0.350): The discrete embedding also reduces seed variance dramatically. With OC-All+Pos, seeds were either "dead" (never bootstrap) or "successful" (converge well), creating bimodal behavior. With OC-All-Disc, all seeds bootstrap reliably, likely because the richer position features reduce the minimum number of lucky exploration steps needed to first complete the task.
+
+### 21.7 Final Answer to Thesis Research Questions
+
+From the complete OC experimental programme (Sections 18–21):
+
+| Research question | Evidence | Answer |
+|---|---|---|
+| Do VQ tokens encode semantic meaning? | Key head: 0.997 for `carrying_key`; hard binary partition (4/16 codes = 1.0) | **YES — demonstrably** |
+| Does factorisation improve alignment? | CLS alone: 0.764 vs key head: 0.997 (absolute improvement +0.233) | **YES — dramatically** |
+| Can discrete tokens support policy learning? | OC-All-Disc: 0.768 mean, 0.945 mean max, 5/5 seeds, near-optimal (max ≈ 0.965) | **YES — near-optimally** |
+| Is a fully discrete representation sufficient? | OC-All-Disc = 0.768 > OC-All+Pos = 0.307 (oracle floats) | **YES — and superior to oracle** |
+
+The fully discrete representation — combining three VQ semantic tokens (agent/key/door) with one pre-trained position embedding token — provides a **complete, interpretable, and highly effective** state description for DoorKey-5x5. The 0.768 mean return (79.6% of Raw's 0.965) and 5/5 seed reliability demonstrate that discretization is not a fundamental barrier to efficient policy learning.
