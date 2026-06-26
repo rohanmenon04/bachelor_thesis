@@ -123,7 +123,7 @@ def train(model, loader, n_epochs):
 
 def plot_training(hist, save_path):
     fig, axes = plt.subplots(2, 3, figsize=(15, 8))
-    fig.suptitle('Object-Centric VQ Encoder — Training Curves', fontsize=12)
+    fig.suptitle('Object Centric VQ Encoder: Training Curves', fontsize=12)
 
     # Row 0: losses
     ax = axes[0, 0]
@@ -154,7 +154,7 @@ def plot_training(hist, save_path):
         ax.plot(hist[key], color=color)
         ax.axhline(K, color='red', linestyle='--', alpha=0.5, label=f'Max K={K}')
         ax.set_ylim(0, K + 2)
-        ax.set_title(f'Perplexity — {title}')
+        ax.set_title(f'Perplexity: {title}')
         ax.set_xlabel('Epoch'); ax.set_ylabel('exp(H)')
         ax.legend(fontsize=7)
 

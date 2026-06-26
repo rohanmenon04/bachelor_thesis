@@ -1,0 +1,8 @@
+V1 Gradient Baseline — K=32, beta=0.25
+Active codes: 11/32
+Perplexity: 8.20
+door_open: acc=0.9689 base=0.9441
+door_locked: acc=0.9482 base=0.9246
+carrying_key: acc=0.6709 base=0.6648
+PPO mean: 0.0000 +/- 0.0000
+Seed returns: [0.0, 0.0, 0.0, 0.0, 0.0]

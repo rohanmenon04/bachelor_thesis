@@ -125,7 +125,7 @@ def plot_probe_results(results, save_path):
     n_l, n_h = len(labels), len(heads)
 
     fig, axes = plt.subplots(n_l, n_h, figsize=(3.5 * n_h, 3 * n_l), sharey=True)
-    fig.suptitle('Object-Centric Heads — Linear Probe Accuracy', fontsize=12)
+    fig.suptitle('Object-Centric Heads: Linear Probe Accuracy', fontsize=12)
 
     for hi, head in enumerate(heads):
         axes[0, hi].set_title(head, fontsize=10, fontweight='bold')
@@ -174,7 +174,7 @@ def plot_codebook_usage(idxs, save_path):
         ax.bar(range(K), counts, color=color, alpha=0.85, width=0.8)
         ax.axhline(len(idxs[head]) / K, color='red', linestyle='--',
                    alpha=0.6, label='Uniform usage')
-        ax.set_title(f'{head} head — {active}/{K} active')
+        ax.set_title(f'{head} head: {active}/{K} active')
         ax.set_xlabel('Token index'); ax.set_ylabel('Count')
         ax.legend(fontsize=7)
 
@@ -261,9 +261,9 @@ def main():
                 print(f"{label:<15} {head:<8} {acc:7.4f} {base:9.4f} {acc - base:+7.4f}")
         print()
 
-    plot_probe_results(results, str(PLOT_DIR / 'probe_results.png'))
-    plot_codebook_usage(idxs, str(PLOT_DIR / 'codebook_usage.png'))
-    plot_label_separation(idxs, label_arrays, str(PLOT_DIR / 'label_separation.png'))
+    plot_probe_results(results, str(PLOT_DIR / 'probe_results_rerun.png'))
+    plot_codebook_usage(idxs, str(PLOT_DIR / 'codebook_usage_rerun.png'))
+    plot_label_separation(idxs, label_arrays, str(PLOT_DIR / 'label_separation_rerun.png'))
 
     print("\nNext: python src/object_centric/03_ppo_oc.py")
 
